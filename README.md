@@ -11,13 +11,15 @@ Predicting late deliveries on the Brazilian Olist marketplace. The goal is to un
 ```
 delivery-intelligence/
 ├── src/
-│   ├── load_data.py      # Merges raw Olist CSVs into a single table, creates delay target
-│   └── feature.py        # Engineers 11 features across temporal, physical, and logistics categories
+│   ├── load_data.py                    # Merges raw Olist CSVs into a single table, creates delay target
+│   └── feature.py                      # Engineers 11 features across temporal, physical, and logistics categories
 ├── notebooks/
-│   └── EDA.ipynb         # Exploratory analysis — 6 insights on delay patterns
-├── models/               # (Week 3) Trained model artefacts
-├── app/                  # (Week 4) Prediction API
-└── dashboard/            # (Week 4) Streamlit dashboard
+│   └── EDA.ipynb                       # Exploratory analysis — 6 insights on delay patterns
+├── dashboard/
+│   ├── Dashboard.pbix                  # Power BI dashboard — delay by region, monthly trends, seller performance
+│   └── dashboard_key_findings.docx     # Written summary of dashboard insights
+├── models/                             # (Week 3) Trained model artefacts
+└── app/                                # (Week 4) Prediction API
 ```
 
 ---
@@ -71,6 +73,6 @@ Output: `data/olist_processed.csv` — 110k rows, ready for modelling.
 
 ## What's Next
 
-- **Week 2:** Power BI dashboard — delay by region, monthly trends, seller performance, and order value vs delay
+- ✅ **Week 2:** Power BI dashboard — delay by region, monthly trends, seller performance, and order value vs delay
 - **Week 3:** Train a binary classifier (XGBoost baseline), SHAP feature importance, replace zip proxy with haversine distance
 - **Week 4:** FastAPI prediction endpoint, Streamlit dashboard for seller-level delay risk
