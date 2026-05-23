@@ -71,8 +71,29 @@ Output: `data/olist_processed.csv` — 110k rows, ready for modelling.
 
 ---
 
+## Dashboard — Key Findings (`dashboard/Dashboard.pbix`)
+
+**Dataset scope: 110,781 orders | Sep 2016 – Aug 2018 | Overall delay rate: 6.58%**
+
+Full written summary: `dashboard/dashboard_key_findings.docx`
+
+1. **Seasonal spikes are predictable and severe** — Delay rate hit 18% in Mar 2018 and 14% in Feb 2018, driven by Carnival and post-holiday volume surges. Pre-allocating carrier capacity for these windows is a direct lever.
+
+2. **Northern states are systemically underserved** — Alagoas (21%) and Maranhão (18%) delay at 3× the national average despite low order volume. Last-mile coverage gaps in remote northern states require dedicated regional logistics partners, not just more volume.
+
+3. **Premium orders delay more often** — Delay rate climbs from 5.5% for orders under R$50 to 8.8% above R$500. Bulkier, heavier items in high-value orders drive longer fulfilment times; priority handling could protect customer lifetime value.
+
+4. **Mid-range shipping distances are the blind spot** — The 10–20 unit distance band peaks at 7.8% delay rate, then drops for longer hauls. Carrier networks appear to optimise for metro and long-haul lanes, leaving mid-range routes underserved.
+
+5. **A small seller cohort drives outsized delays** — 12 sellers (with 50+ orders) exceed a 15% delay rate. Targeted SLA enforcement on this cohort is estimated to reduce overall delays by 0.3–0.5 percentage points.
+
+6. **Estimates are padded by ~15 days** — Carriers deliver in 9 days on average against a 24-day estimate. Olist over-promises systematically, masking true operational performance. Tightening estimates by 5 days would improve transparency without increasing late deliveries.
+
+---
+
 ## What's Next
 
+- ✅ **Week 1:** Data pipeline, feature engineering, and EDA
 - ✅ **Week 2:** Power BI dashboard — delay by region, monthly trends, seller performance, and order value vs delay
 - **Week 3:** Train a binary classifier (XGBoost baseline), SHAP feature importance, replace zip proxy with haversine distance
 - **Week 4:** FastAPI prediction endpoint, Streamlit dashboard for seller-level delay risk
