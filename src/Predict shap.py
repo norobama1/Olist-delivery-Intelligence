@@ -15,23 +15,19 @@ from model_config import (
 
 ROOT       = Path(__file__).resolve().parent.parent
 DATA_PATH  = ROOT / "data" / "olist_processed.csv"
-MODEL_PATH = ROOT / "models" / "xgb_pipeline.joblib"
-META_PATH  = ROOT / "models" / "model_meta.joblib"
+MODEL_PATH = ROOT / "models" / "model_bundle.joblib"
 OUT_DIR    = ROOT / "models"
 
-# Rows passed to SHAP — 2 000 balances speed and representativeness
 SHAP_SAMPLE = 2000
 
 
 def load_test_split():
-    """Reproduce the exact stratified test split used in training."""
+    """Reproduce the exact temporal test split used in training."""
     df = pd.read_csv(DATA_PATH, parse_dates=["order_purchase_timestamp"])
     df = df.sort_values("order_purchase_timestamp").reset_index(drop=True)
     df = add_derived_features(df)
-    X = df[ALL_FEATURES]
-    y = df[TARGET]
     _, X_test, _, y_test = train_test_split(
-        X, y, test_size=0.20, random_state=42, stratify=y
+        df[ALL_FEATURES], df[TARGET], test_size=0.20, shuffle=False
     )
     return X_test.reset_index(drop=True), y_test.reset_index(drop=True)
 
@@ -39,6 +35,23 @@ def load_test_split():
 def feature_names():
     """Feature names in ColumnTransformer output order: num → pass → cat."""
     return NUMERIC_FEATURES + PASSTHROUGH_FEATURES + ORDINAL_CATEGORICAL_FEATURES
+
+
+def extract_shap(explainer, X_arr, model):
+    """Return (shap_values, expected_value) for the positive class.
+
+    SHAP output varies by version:
+      list of arrays      → old API, one array per class
+      3D (n, f, classes)  → SHAP 0.46+, last axis is classes
+      2D (n, f)           → already positive class
+    """
+    raw = explainer.shap_values(X_arr)
+    ev  = explainer.expected_value
+    if isinstance(raw, list):
+        return raw[1], float(ev[1])
+    if raw.ndim == 3:                    # (n_samples, n_features, n_classes)
+        return raw[:, :, 1], float(ev[1])
+    return raw, float(ev[1]) if hasattr(ev, "__len__") else float(ev)
 
 
 def save_fig(filename):
@@ -49,17 +62,19 @@ def save_fig(filename):
 
 
 def main():
-    pipeline  = joblib.load(MODEL_PATH)
-    threshold = joblib.load(META_PATH)["threshold"]
-    print(f"Loaded model  : {MODEL_PATH.name}")
-    print(f"Threshold     : {threshold:.3f}")
+    bundle     = joblib.load(MODEL_PATH)
+    pipeline   = bundle["model"]
+    threshold  = bundle["threshold"]
+    model_name = bundle["model_name"]
+    print(f"Model     : {model_name}")
+    print(f"Threshold : {threshold:.3f}")
 
     preprocessor = pipeline.named_steps["pre"]
-    xgb_model    = pipeline.named_steps["clf"]
+    clf          = pipeline.named_steps["clf"]
 
     X_test, y_test = load_test_split()
 
-    # Transform to numpy array — TreeExplainer requires raw array, not DataFrame
+    # Transform to numpy — TreeExplainer requires array, not DataFrame
     X_arr = preprocessor.transform(X_test)
     names = feature_names()
 
@@ -70,8 +85,8 @@ def main():
     y_shap = y_test.iloc[idx].reset_index(drop=True)
 
     print(f"\nComputing SHAP on {len(X_shap):,} rows ...")
-    explainer   = shap.TreeExplainer(xgb_model)
-    shap_values = explainer.shap_values(X_shap)
+    explainer             = shap.TreeExplainer(clf)
+    shap_values, exp_val  = extract_shap(explainer, X_shap, clf)
 
     # ── 1. Beeswarm summary ───────────────────────────────────────────────────
     shap.summary_plot(
@@ -113,7 +128,7 @@ def main():
     if delayed_positions:
         i = delayed_positions[0]
         shap.force_plot(
-            explainer.expected_value,
+            exp_val,
             shap_values[i],
             X_shap[i],
             feature_names=names,

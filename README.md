@@ -11,15 +11,25 @@ Predicting late deliveries on the Brazilian Olist marketplace. The goal is to un
 ```
 delivery-intelligence/
 ├── src/
-│   ├── load_data.py                    # Merges raw Olist CSVs into a single table, creates delay target
-│   └── feature.py                      # Engineers 11 features across temporal, physical, and logistics categories
+│   ├── load_data.py          # Merges raw Olist CSVs, creates delay target
+│   ├── feature.py            # Engineers features across temporal, physical, and logistics categories
+│   ├── model_config.py       # Feature lists, preprocessor, derived feature logic
+│   ├── train_model.py        # LR / RF / XGBoost training, hyperparameter search, threshold optimisation
+│   ├── Predict shap.py       # SHAP beeswarm, bar, dependence, and force plots
+│   └── Main.py               # FastAPI prediction server
+├── app/
+│   └── schemas.py            # Pydantic request/response models
+├── tests/
+│   └── test_api.py           # Pytest smoke tests (health, predict, batch, validation)
 ├── notebooks/
-│   └── EDA.ipynb                       # Exploratory analysis — 6 insights on delay patterns
+│   └── EDA.ipynb             # Exploratory analysis — 6 insights on delay patterns
 ├── dashboard/
-│   ├── Dashboard.pbix                  # Power BI dashboard — delay by region, monthly trends, seller performance
-│   └── dashboard_key_findings.docx     # Written summary of dashboard insights
-├── models/                             # (Week 3) Trained model artefacts
-└── app/                                # (Week 4) Prediction API
+│   ├── Dashboard.pbix        # Power BI dashboard
+│   └── dashboard_key_findings.docx
+├── models/                   # Trained artefacts and SHAP plots
+├── Dockerfile
+├── requirements.txt          # Full dev dependencies
+└── requirements-api.txt      # Lean runtime dependencies for the API container
 ```
 
 ---
@@ -31,7 +41,8 @@ Download the [Olist dataset from Kaggle](https://www.kaggle.com/datasets/olistbr
 ```bash
 pip install -r requirements.txt
 python src/load_data.py
-python src/features.py
+python src/feature.py
+python src/train_model.py
 ```
 
 ---
@@ -40,16 +51,58 @@ python src/features.py
 
 `load_data.py` merges 7 raw Olist tables, filters to delivered orders, and creates the target (`delayed = 1` if actual > estimated delivery date).
 
-`feature.py` engineers 11 features across four categories:
+`feature.py` + `model_config.py` engineer 14 features across four categories:
 
 | Category | Features |
 |----------|----------|
-| Temporal | `shipping_days`, `estimated_days`, `approval_hours`, `purchase_dayofweek`, `purchase_month` |
-| Physical | `product_weight_g`, `product_volume_cm3`, `order_value` |
-| Logistics | `freight_value`, `zip_distance_proxy` |
-| Calendar | `is_peak_delayed_period` (flags March, November, December) |
+| Temporal | `estimated_days`, `approval_hours`, `purchase_dayofweek`, `purchase_month` |
+| Physical | `product_weight_g`, `product_volume_cm3`, `order_value`, `freight_value` |
+| Logistics | `zip_distance_proxy`, `seller_delay_rate` ¹ |
+| Calendar | `is_peak_delayed_period`, `is_weekend` |
+| Geographic | `seller_state`, `customer_state` |
+
+¹ `seller_delay_rate` — each seller's historical delay rate computed from past orders only (`shift(1).expanding().mean()`), fully leak-free.
 
 Output: `data/olist_processed.csv` — 110k rows, ready for modelling.
+
+---
+
+## Model Training (`src/train_model.py`)
+
+Three models trained and compared on a stratified 70 / 15 / 15 train / val / test split:
+
+| Model | Val PR-AUC | Selected |
+|-------|-----------|----------|
+| Logistic Regression | 0.1595 | |
+| Random Forest | 0.3687 | ✅ |
+| XGBoost (tuned + calibrated) | 0.3394 | |
+
+**Selection criterion:** val PR-AUC on a held-out validation set the models never trained on.
+
+**Threshold:** optimised for business cost (`5 × FN + 1 × FP`) — missing a delay costs 5× more than a false alarm — giving threshold = 0.1477.
+
+### Final model performance (Random Forest, stratified test set)
+
+| Metric | Value |
+|--------|-------|
+| ROC-AUC | **0.8228** |
+| PR-AUC | **0.4017** |
+| F1 | **0.3881** |
+| Threshold | 0.1477 |
+| Delayed precision | 0.33 |
+| Delayed recall | 0.47 |
+
+---
+
+## SHAP Explainability (`src/Predict shap.py`)
+
+Top 3 features by mean |SHAP| (Random Forest):
+
+1. `seller_delay_rate` — dominant signal; a seller's past behaviour is the strongest predictor of future delays
+2. `estimated_days` — short promise windows are high-risk
+3. `freight_value` — encodes route complexity and distance
+
+Plots saved to `models/`: beeswarm summary, bar importance, dependence plots (top 3), force plot (single delayed order).
 
 ---
 
@@ -57,17 +110,12 @@ Output: `data/olist_processed.csv` — 110k rows, ready for modelling.
 
 **Overall delay rate: 6.6%**
 
-1. **Delays are seasonal** — March (14.5%) and November (12%) are the two peak months, driven by post-Carnival and Black Friday surges. Mid-year months run as low as 2%.
-
-2. **Zip distance proxy is weak** — the 2-digit zip prefix difference doesn't map cleanly to geography. The state-to-state heatmap gives a cleaner signal.
-
-3. **Route matters more than distance** — DF→ES delays at 30.4%, DF→SC at 19.2%. Same-state routes (SP→SP) stay below 5%. The problem is specific corridors, not distance in general.
-
-4. **Freight cost predicts delays, weight does not** — high-freight orders delay at 8.0% vs 5.2% for low-freight. Freight cost already encodes weight, distance and route difficulty, so weight adds nothing on top.
-
-5. **Delays are concentrated in ~24% of sellers** — 321 of 1,344 active sellers cause 80% of all delays. This is a seller problem, not a platform-wide logistics problem.
-
-6. **Sellers who overpromise delay at 3.5x the rate** — orders with ≤7 day promised delivery delay at 16.5% vs 4.7% for 30+ day windows. Constraining aggressive delivery estimates would reduce delays without touching logistics.
+1. **Delays are seasonal** — March (14.5%) and November (12%) are the two peak months, driven by post-Carnival and Black Friday surges.
+2. **Zip distance proxy is weak** — the state-to-state heatmap gives a cleaner signal.
+3. **Route matters more than distance** — DF→ES delays at 30.4%, DF→SC at 19.2%. Same-state routes (SP→SP) stay below 5%.
+4. **Freight cost predicts delays, weight does not** — high-freight orders delay at 8.0% vs 5.2% for low-freight.
+5. **Delays are concentrated in ~24% of sellers** — 321 of 1,344 active sellers cause 80% of all delays.
+6. **Sellers who overpromise delay at 3.5× the rate** — orders with ≤7 day promised delivery delay at 16.5% vs 4.7% for 30+ day windows.
 
 ---
 
@@ -75,25 +123,62 @@ Output: `data/olist_processed.csv` — 110k rows, ready for modelling.
 
 **Dataset scope: 110,781 orders | Sep 2016 – Aug 2018 | Overall delay rate: 6.58%**
 
-Full written summary: `dashboard/dashboard_key_findings.docx`
+1. **Seasonal spikes are predictable** — Delay rate hit 18% in Mar 2018, 14% in Feb 2018.
+2. **Northern states are systemically underserved** — Alagoas (21%) and Maranhão (18%) delay at 3× the national average.
+3. **Premium orders delay more often** — Rate climbs from 5.5% under R$50 to 8.8% above R$500.
+4. **Mid-range shipping distances are the blind spot** — The 10–20 unit distance band peaks at 7.8% delay rate.
+5. **A small seller cohort drives outsized delays** — 12 sellers exceed 15% delay rate.
+6. **Estimates are padded by ~15 days** — Carriers deliver in 9 days against a 24-day estimate.
 
-1. **Seasonal spikes are predictable and severe** — Delay rate hit 18% in Mar 2018 and 14% in Feb 2018, driven by Carnival and post-holiday volume surges. Pre-allocating carrier capacity for these windows is a direct lever.
+---
 
-2. **Northern states are systemically underserved** — Alagoas (21%) and Maranhão (18%) delay at 3× the national average despite low order volume. Last-mile coverage gaps in remote northern states require dedicated regional logistics partners, not just more volume.
+## Prediction API (`src/Main.py`)
 
-3. **Premium orders delay more often** — Delay rate climbs from 5.5% for orders under R$50 to 8.8% above R$500. Bulkier, heavier items in high-value orders drive longer fulfilment times; priority handling could protect customer lifetime value.
+FastAPI serving the best model with three endpoints:
 
-4. **Mid-range shipping distances are the blind spot** — The 10–20 unit distance band peaks at 7.8% delay rate, then drops for longer hauls. Carrier networks appear to optimise for metro and long-haul lanes, leaving mid-range routes underserved.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Model load status and feature count |
+| `/predict` | POST | Single order delay probability + risk band |
+| `/predict/batch` | POST | Batch predictions |
 
-5. **A small seller cohort drives outsized delays** — 12 sellers (with 50+ orders) exceed a 15% delay rate. Targeted SLA enforcement on this cohort is estimated to reduce overall delays by 0.3–0.5 percentage points.
+**Run locally:**
+```bash
+python src/Main.py
+# → http://localhost:8000/docs
+```
 
-6. **Estimates are padded by ~15 days** — Carriers deliver in 9 days on average against a 24-day estimate. Olist over-promises systematically, masking true operational performance. Tightening estimates by 5 days would improve transparency without increasing late deliveries.
+**Run with Docker:**
+```bash
+docker build -t olist-delay-api .
+docker run -p 8000:8000 olist-delay-api
+```
+
+**Example response:**
+```json
+{
+  "delay_probability": 0.165,
+  "threshold": 0.1477,
+  "predicted_delayed": true,
+  "risk_band": "high"
+}
+```
+
+---
+
+## Tests
+
+```bash
+pytest tests/
+```
+
+5 smoke tests covering health check, valid prediction, batch prediction, input validation (422 on bad state code), and high-risk order flagging.
 
 ---
 
 ## What's Next
 
 - ✅ **Week 1:** Data pipeline, feature engineering, and EDA
-- ✅ **Week 2:** Power BI dashboard — delay by region, monthly trends, seller performance, and order value vs delay
-- **Week 3:** Train a binary classifier (XGBoost baseline), SHAP feature importance, replace zip proxy with haversine distance
-- **Week 4:** FastAPI prediction endpoint, Streamlit dashboard for seller-level delay risk
+- ✅ **Week 2:** Power BI dashboard — delay by region, monthly trends, seller performance
+- ✅ **Week 3:** Model training (LR / RF / XGBoost), SHAP explainability, cost-sensitive threshold, seller delay rate feature
+- ✅ **Week 4:** FastAPI prediction API, Docker containerisation, pytest smoke tests

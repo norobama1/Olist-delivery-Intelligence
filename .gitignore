@@ -25,6 +25,10 @@ env/
 Thumbs.db
 desktop.ini
 
+# Large model artefacts — too big for GitHub (>100 MB); regenerate with train_model.py
+models/best_pipeline.joblib
+models/model_bundle.joblib
+
 # Claude Code
 .claude/
 
