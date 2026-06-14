@@ -175,10 +175,3 @@ pytest tests/
 5 smoke tests covering health check, valid prediction, batch prediction, input validation (422 on bad state code), and high-risk order flagging.
 
 ---
-
-## What's Next
-
-- ✅ **Week 1:** Data pipeline, feature engineering, and EDA
-- ✅ **Week 2:** Power BI dashboard — delay by region, monthly trends, seller performance
-- ✅ **Week 3:** Model training (LR / RF / XGBoost), SHAP explainability, cost-sensitive threshold, seller delay rate feature
-- ✅ **Week 4:** FastAPI prediction API, Docker containerisation, pytest smoke tests
