@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from Main import app  # noqa: E402
+from main import app  # noqa: E402
 
 VALID_PAYLOAD = {
     "estimated_days": 6.0,

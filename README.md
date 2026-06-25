@@ -15,8 +15,8 @@ delivery-intelligence/
 │   ├── feature.py            # Engineers features across temporal, physical, and logistics categories
 │   ├── model_config.py       # Feature lists, preprocessor, derived feature logic
 │   ├── train_model.py        # LR / RF / XGBoost training, hyperparameter search, threshold optimisation
-│   ├── Predict shap.py       # SHAP beeswarm, bar, dependence, and force plots
-│   └── Main.py               # FastAPI prediction server
+│   ├── predict_shap.py       # SHAP beeswarm, bar, dependence, and force plots
+│   └── main.py               # FastAPI prediction server
 ├── app/
 │   └── schemas.py            # Pydantic request/response models
 ├── tests/
@@ -94,7 +94,7 @@ Three models trained and compared on a stratified 70 / 15 / 15 train / val / tes
 
 ---
 
-## SHAP Explainability (`src/Predict shap.py`)
+## SHAP Explainability (`src/predict_shap.py`)
 
 Top 3 features by mean |SHAP| (Random Forest):
 
@@ -132,7 +132,7 @@ Plots saved to `models/`: beeswarm summary, bar importance, dependence plots (to
 
 ---
 
-## Prediction API (`src/Main.py`)
+## Prediction API (`src/main.py`)
 
 FastAPI serving the best model with three endpoints:
 
@@ -144,7 +144,7 @@ FastAPI serving the best model with three endpoints:
 
 **Run locally:**
 ```bash
-python src/Main.py
+python src/main.py
 # → http://localhost:8000/docs
 ```
 
