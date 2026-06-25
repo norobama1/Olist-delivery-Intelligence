@@ -51,7 +51,7 @@ python src/train_model.py
 
 `load_data.py` merges 7 raw Olist tables, filters to delivered orders, and creates the target (`delayed = 1` if actual > estimated delivery date).
 
-`feature.py` + `model_config.py` engineer 14 features across four categories:
+`feature.py` + `model_config.py` engineer 14 features across five categories:
 
 | Category | Features |
 |----------|----------|
