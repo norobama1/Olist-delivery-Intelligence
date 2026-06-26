@@ -98,9 +98,9 @@ Three models trained and compared on a stratified 70 / 15 / 15 train / val / tes
 
 Top 3 features by mean |SHAP| (XGBoost):
 
-1. `seller_delay_rate` — dominant signal; a seller's past behaviour is the strongest predictor of future delays
+1. `purchase_month` — seasonality is the strongest signal; March and November/December are high-delay periods
 2. `estimated_days` — short promise windows are high-risk
-3. `freight_value` — encodes route complexity and distance
+3. `customer_state` — destination region drives logistics complexity
 
 Plots saved to `models/`: beeswarm summary, bar importance, dependence plots (top 3), force plot (single delayed order).
 
