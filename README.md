@@ -26,6 +26,9 @@ delivery-intelligence/
 ├── dashboard/
 │   ├── Dashboard.pbix        # Power BI dashboard
 │   └── dashboard_key_findings.docx
+├── rag/
+│   ├── embedding.py          # Embeds review text with a multilingual sentence-transformer
+│   └── search.py             # Semantic search over embedded reviews with delay filter
 ├── models/                   # Trained artefacts and SHAP plots
 ├── Dockerfile
 ├── requirements.txt          # Full dev dependencies
@@ -51,7 +54,7 @@ python src/train_model.py
 
 `load_data.py` merges 7 raw Olist tables, filters to delivered orders, and creates the target (`delayed = 1` if actual > estimated delivery date).
 
-`feature.py` + `model_config.py` engineer 14 features across five categories:
+`feature.py` + `model_config.py` engineer 15 features across five categories:
 
 | Category | Features |
 |----------|----------|
@@ -63,7 +66,7 @@ python src/train_model.py
 
 ¹ `seller_delay_rate` — each seller's historical delay rate computed from past orders only (`shift(1).expanding().mean()`), fully leak-free.
 
-Output: `data/olist_processed.csv` — 110k rows, ready for modelling.
+Output: `data/olist_processed.csv` — ~96k order-level rows, ready for modelling.
 
 ---
 
@@ -158,7 +161,7 @@ docker run -p 8000:8000 olist-delay-api
 ```json
 {
   "delay_probability": 0.165,
-  "threshold": 0.1477,
+  "threshold": 0.118,
   "predicted_delayed": true,
   "risk_band": "high"
 }
@@ -175,3 +178,47 @@ pytest tests/
 5 smoke tests covering health check, valid prediction, batch prediction, input validation (422 on bad state code), and high-risk order flagging.
 
 ---
+
+## RAG — Semantic Review Search (`rag/`)
+
+A retrieval system that lets you query customer review text and filter by delivery outcome, so you can compare the language delayed vs on-time customers use.
+
+**Model:** `paraphrase-multilingual-MiniLM-L12-v2` — handles Portuguese reviews natively.
+
+**Build the index (run once):**
+```bash
+python rag/embedding.py
+# → Embeds ~40k labeled reviews and caches to rag/embeddings_cache.pkl
+```
+
+**Search:**
+```bash
+python rag/search.py
+# Runs: search_reviews("prazo de entrega muito curto", filter_delayed=1, top_k=10)
+```
+
+**Python API:**
+```python
+from rag.search import search_reviews
+
+# Top 10 reviews mentioning delivery deadline issues, from delayed orders only
+results = search_reviews("prazo de entrega muito curto", filter_delayed=1, top_k=10)
+print(results[["review_comment_message", "review_score", "similarity"]])
+
+# Compare language: same query on on-time orders
+results_ontime = search_reviews("prazo de entrega muito curto", filter_delayed=0, top_k=10)
+```
+
+**Returns:** `order_id`, `review_score`, `review_comment_message`, `delayed`, `similarity` (cosine).
+
+Key use case: understand *what customers say* when orders are late vs on time — feeds qualitative context back into the prediction pipeline.
+
+---
+
+## What's Next
+
+- ✅ **Week 1:** Data pipeline, feature engineering, and EDA
+- ✅ **Week 2:** Power BI dashboard — delay by region, monthly trends, seller performance
+- ✅ **Week 3:** Model training (LR / RF / XGBoost), SHAP explainability, cost-sensitive threshold, seller delay rate feature
+- ✅ **Week 4:** FastAPI prediction API, Docker containerisation, pytest smoke tests
+- ✅ **Week 5:** RAG semantic search over customer reviews, order-level aggregation, n_items feature, XGBoost selected as best model
