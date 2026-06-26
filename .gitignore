@@ -29,6 +29,9 @@ desktop.ini
 models/best_pipeline.joblib
 models/model_bundle.joblib
 
+# RAG embedding cache — regenerate with rag/embedding.py
+rag/embeddings_cache.pkl
+
 # Claude Code
 .claude/
 
