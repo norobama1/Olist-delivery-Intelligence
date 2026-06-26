@@ -22,12 +22,12 @@ SHAP_SAMPLE = 2000
 
 
 def load_test_split():
-    """Reproduce the exact temporal test split used in training."""
+    """Reproduce the exact stratified test split used in training."""
     df = pd.read_csv(DATA_PATH, parse_dates=["order_purchase_timestamp"])
     df = df.sort_values("order_purchase_timestamp").reset_index(drop=True)
     df = add_derived_features(df)
     _, X_test, _, y_test = train_test_split(
-        df[ALL_FEATURES], df[TARGET], test_size=0.20, shuffle=False
+        df[ALL_FEATURES], df[TARGET], test_size=0.20, random_state=42, stratify=df[TARGET]
     )
     return X_test.reset_index(drop=True), y_test.reset_index(drop=True)
 
@@ -69,8 +69,16 @@ def main():
     print(f"Model     : {model_name}")
     print(f"Threshold : {threshold:.3f}")
 
-    preprocessor = pipeline.named_steps["pre"]
-    clf          = pipeline.named_steps["clf"]
+    # CalibratedClassifierCV wraps the pipeline — unwrap the first inner estimator.
+    # SHAP values on the uncalibrated XGBoost are still valid for feature importance
+    # since calibration only rescales probabilities monotonically.
+    if hasattr(pipeline, "calibrated_classifiers_"):
+        inner_pipe   = pipeline.calibrated_classifiers_[0].estimator
+        preprocessor = inner_pipe.named_steps["pre"]
+        clf          = inner_pipe.named_steps["clf"]
+    else:
+        preprocessor = pipeline.named_steps["pre"]
+        clf          = pipeline.named_steps["clf"]
 
     X_test, y_test = load_test_split()
 
