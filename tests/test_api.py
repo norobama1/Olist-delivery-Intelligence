@@ -28,6 +28,7 @@ VALID_PAYLOAD = {
     "zip_distance_proxy": 24.0,
     "seller_delay_rate": 0.18,
     "is_peak_delayed_period": 1,
+    "n_items": 2,
     "seller_state": "SP",
     "customer_state": "BA",
 }
@@ -46,7 +47,7 @@ def test_health_returns_200(client):
     body = r.json()
     assert body["status"] == "ok"
     assert body["model_loaded"] is True
-    assert body["n_features"] == 14
+    assert body["n_features"] == 15
 
 
 def test_predict_valid_payload_returns_200(client):

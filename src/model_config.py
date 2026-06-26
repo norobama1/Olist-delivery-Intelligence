@@ -14,6 +14,7 @@ NUMERIC_FEATURES =[
     "freight_value",
     "zip_distance_proxy",
     "seller_delay_rate",
+    "n_items",
 ]
 
 PASSTHROUGH_FEATURES =[

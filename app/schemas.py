@@ -14,7 +14,7 @@ BR_STATES = {
 class DeliveryFeatures(BaseModel):
     """Features known at purchase time for a single order.
 
-    Matches the 14 columns the trained pipeline expects (is_weekend is derived
+    Matches the 15 columns the trained pipeline expects (is_weekend is derived
     in the API from purchase_dayofweek). Excludes identifiers, the target
     (delayed), and post-shipment leakage columns (shipping_days,
     delivery_delay_days).
@@ -31,6 +31,7 @@ class DeliveryFeatures(BaseModel):
     zip_distance_proxy: float = Field(..., ge=0, description="Coarse seller->customer distance proxy from CEP prefixes.")
     seller_delay_rate: float = Field(..., ge=0, le=1, description="Seller's historical share of late deliveries, computed only from data before this order.")
     is_peak_delayed_period: int = Field(..., ge=0, le=1, description="1 if the order falls in a known high-delay month; set upstream in features.py.")
+    n_items: int = Field(..., ge=1, description="Number of distinct items in the order.")
     seller_state: str = Field(..., description="Brazilian UF, e.g. 'SP'.")
     customer_state: str = Field(..., description="Brazilian UF, e.g. 'RJ'.")
 
@@ -56,6 +57,7 @@ class DeliveryFeatures(BaseModel):
                 "zip_distance_proxy": 24.0,
                 "seller_delay_rate": 0.18,
                 "is_peak_delayed_period": 1,
+                "n_items": 2,
                 "seller_state": "SP",
                 "customer_state": "BA",
             }

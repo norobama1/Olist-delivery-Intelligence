@@ -57,7 +57,7 @@ python src/train_model.py
 |----------|----------|
 | Temporal | `estimated_days`, `approval_hours`, `purchase_dayofweek`, `purchase_month` |
 | Physical | `product_weight_g`, `product_volume_cm3`, `order_value`, `freight_value` |
-| Logistics | `zip_distance_proxy`, `seller_delay_rate` ¹ |
+| Logistics | `zip_distance_proxy`, `seller_delay_rate` ¹, `n_items` |
 | Calendar | `is_peak_delayed_period`, `is_weekend` |
 | Geographic | `seller_state`, `customer_state` |
 
@@ -73,30 +73,30 @@ Three models trained and compared on a stratified 70 / 15 / 15 train / val / tes
 
 | Model | Val PR-AUC | Selected |
 |-------|-----------|----------|
-| Logistic Regression | 0.1595 | |
-| Random Forest | 0.3687 | ✅ |
-| XGBoost (tuned + calibrated) | 0.3394 | |
+| Logistic Regression | 0.1387 | |
+| Random Forest | 0.2206 | |
+| XGBoost (tuned + calibrated) | 0.2333 | ✅ |
 
 **Selection criterion:** val PR-AUC on a held-out validation set the models never trained on.
 
-**Threshold:** optimised for business cost (`5 × FN + 1 × FP`) — missing a delay costs 5× more than a false alarm — giving threshold = 0.1477.
+**Threshold:** optimised for business cost (`5 × FN + 1 × FP`) — missing a delay costs 5× more than a false alarm — giving threshold = 0.118.
 
-### Final model performance (Random Forest, stratified test set)
+### Final model performance (XGBoost calibrated, stratified test set)
 
 | Metric | Value |
 |--------|-------|
-| ROC-AUC | **0.8228** |
-| PR-AUC | **0.4017** |
-| F1 | **0.3881** |
-| Threshold | 0.1477 |
-| Delayed precision | 0.33 |
-| Delayed recall | 0.47 |
+| ROC-AUC | **0.7875** |
+| PR-AUC | **0.2577** |
+| F1 | **0.3150** |
+| Threshold | 0.118 |
+| Delayed precision | 0.23 |
+| Delayed recall | 0.51 |
 
 ---
 
 ## SHAP Explainability (`src/predict_shap.py`)
 
-Top 3 features by mean |SHAP| (Random Forest):
+Top 3 features by mean |SHAP| (XGBoost):
 
 1. `seller_delay_rate` — dominant signal; a seller's past behaviour is the strongest predictor of future delays
 2. `estimated_days` — short promise windows are high-risk

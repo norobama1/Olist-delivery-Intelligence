@@ -30,6 +30,7 @@ FEATURE_COLS = [
     'freight_value',
     'zip_distance_proxy',
     'is_peak_delayed_period',
+    'n_items',
 ]
 
 def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -79,6 +80,24 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df = add_calender_features(df)
     return df
 
+def aggregate_to_order_level(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Collapse item-level rows to one row per order_id, after feature
+    engineering. Physical features are summed across items (multi-item
+    orders carry more weight/volume/value); everything else is shared
+    across items in the same order, so 'first' is correct, not lossy.
+    """
+    sum_cols = ["product_weight_g", "product_volume_cm3", "order_value", "freight_value"]
+    sum_cols = [c for c in sum_cols if c in df.columns]
+
+    other_cols = [c for c in df.columns if c not in sum_cols and c != "order_id"]
+
+    summed = df.groupby("order_id")[sum_cols].sum()
+    first_vals = df.groupby("order_id")[other_cols].first()
+    n_items = df.groupby("order_id").size().rename("n_items")
+
+    return first_vals.join(summed).join(n_items).reset_index()
+
 def main():
     input_path = os.path.join(DATA_DIR, "olist.merged.csv")
     print(f"Reading {input_path}....")
@@ -92,6 +111,11 @@ def main():
     if neg:
         print(f"  Dropping {neg} rows with negative shipping_days (carrier/delivery timestamp errors)")
         df = df[df['shipping_days'] >= 0].reset_index(drop=True)
+    
+    print("Aggregating to order level...")
+    before = len(df)
+    df = aggregate_to_order_level(df)
+    print(f"  {before:,} item-rows → {len(df):,} order-level rows ({df['order_id'].nunique():,} unique orders)")
 
     missing = df[FEATURE_COLS].isnull().sum()
     missing = missing[missing >0]
