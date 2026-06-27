@@ -1,15 +1,15 @@
-# src/features.py
+# src/feature.py
 
 """
-Engineer 11 delivery-delay features across four categories:
-temporal, physical , logistics and calender
+Engineer 15 delivery-delay features across five categories:
+temporal, physical, logistics, calendar, and geographic.
 
-Usage: 
-src/load_data.py
-src/feature.py
+Usage:
+    python src/load_data.py   # produces data/olist.merged.csv
+    python src/feature.py     # produces data/olist_processed.csv
 
 Input: data/olist.merged.csv
-Output: data/olist.features.csv
+Output: data/olist_processed.csv
 """
 
 from pandas import errors
